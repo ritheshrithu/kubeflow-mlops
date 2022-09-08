@@ -28,7 +28,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ./Dockerfile
+          file: ./Dockerfile.pipeline
           push: true
           tags: ritheshrithu/kubeflow-mlops-base:latest
     # name: Get OCIR Repository Test
