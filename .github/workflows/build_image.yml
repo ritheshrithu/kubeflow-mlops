@@ -11,25 +11,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-      steps:
-        - name: Checkout 
-          uses: actions/checkout@v2
-        - name: Login to Docker Hub
-          uses: docker/login-action@v1
-          with:
-            username: ritheshrithu
-            password: dckr_pat_C_NXf30dhEznYuapxb2Vz-adMKs
+    name: push to docker
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v2
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ritheshrithu
+          password: dckr_pat_C_NXf30dhEznYuapxb2Vz-adMKs
 
-        - name: Set up Docker Buildx
-          uses: docker/setup-buildx-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
 
-        - name: Build and push
-          uses: docker/build-push-action@v2
-          with:
-            context: .
-            file: ./Dockerfile
-            push: true
-            tags: ritheshrithu/kubeflow-mlops-base:latest
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ritheshrithu/kubeflow-mlops-base:latest
     # name: Get OCIR Repository Test
     # env:
     #   OCI_CLI_USER: ocid1.user.oc1..aaaaaaaabhqjnsbfvvrv4jrwgiizwwh32b7lzvzyhwed6msrrxhnewwhw6sq
