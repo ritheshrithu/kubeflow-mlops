@@ -52,7 +52,7 @@ jobs:
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
-          github_token: ${{secrets.GIT_TOKEN}}
+          github_token: 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
 
     # name: Get OCIR Repository Test
     # env:
