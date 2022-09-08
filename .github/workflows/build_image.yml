@@ -3,84 +3,153 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main
     paths-ignore:
       - '**/*.ipynb'
       - 'data/**'
+
 jobs:
-  build:
+  get-ocir-repository-test:
     runs-on: ubuntu-latest
+    name: Get OCIR Repository Test
+    env:
+      OCI_CLI_USER: ocid1.user.oc1..aaaaaaaabhqjnsbfvvrv4jrwgiizwwh32b7lzvzyhwed6msrrxhnewwhw6sq
+      OCI_CLI_TENANCY: ocid1.tenancy.oc1..aaaaaaaaiyavtwbz4kyu7g7b6wglllccbflmjx2lzk5nwpbme44mv54xu7dq
+      OCI_CLI_FINGERPRINT: eb:13:fe:e2:9d:a0:20:7c:10:83:69:3a:a2:56:45:e7
+      OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_PRIVATE_KEY }}
+      OCI_CLI_REGION: us-phoenix-1
     steps:
+      - name: Get or create an OCIR Repository
+        uses: oracle-actions/get-ocir-repository@v1.0
+        id: get-ocir-repository
+        with:
+          name: oraclelinux
+          compartment: ocid1.compartment.oc1..aaaaaaaajy3b35llouj2puk7edql63bfknq7ncww4qubeuatvwihpvl6xu2a
 
-    - name: Install jq and sponge
-      run: |
-        sudo apt-get install -y jq moreutils
+      - name: Log into OCIR
+        uses: oracle-actions/login-ocir@v1.0
+        id: login-ocir
+        with:
+          auth_token: ${{ secrets.OCI_AUTH_TOKEN }}
 
-    - name: Check out
-      uses: actions/checkout@v1
+      # - name: Tag and push a container image
+      #   id: tag-and-push-image
+      #   run: |
+      #     docker pull oraclelinux:8-slim
+      #     docker tag "oraclelinux:8-slim" "${{ steps.get-ocir-repository.outputs.repo_path }}:8-slim"
+      #     docker push "${{ steps.get-ocir-repository.outputs.repo_path }}:8-slim"
 
-    - name: Login into a registry
-      uses: azure/docker-login@v1
-      with:
-        username: ${{ secrets.REGISTRY_USERNAME }}
-        password: ${{ secrets.REGISTRY_PASSWORD }}
+      - name: Build, tag and push the base image
+        run: |
+          docker build -t ritheshrithu/kubeflow-mlops-base:${GITHUB_SHA::8} -f Dockerfile.pipeline .
+          docker push ritheshrithu/kubeflow-mlops-base:${GITHUB_SHA::8}
+          docker tag  ritheshrithu/kubeflow-mlops-base:${GITHUB_SHA::8} ritheshrithu/kubeflow-mlops-base:latest
+          docker push ritheshrithu/kubeflow-mlops-base:latest
 
-    - name: Build, tag and push the base image
-      run: |
-        docker build -t chanwit/titanic-mlops-base:${GITHUB_SHA::8} -f Dockerfile.pipeline .
-        docker push chanwit/titanic-mlops-base:${GITHUB_SHA::8}
-        docker tag  chanwit/titanic-mlops-base:${GITHUB_SHA::8} chanwit/titanic-mlops-base:latest
-        docker push chanwit/titanic-mlops-base:latest
 
-    - name: Create changes back to Jupyter Notebook
-      run: |
-        jq --arg IMAGE_NAME "chanwit/titanic-mlops-base:${GITHUB_SHA::8}" \
-          '.metadata.kubeflow_noteobok.docker_image=$IMAGE_NAME' < titanic_ml_comparison.ipynb \
-          | sponge titanic_ml_comparison.ipynb
+# name: CI
 
-    - name: Commit files
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git commit -am "Update image to chanwit/titanic-mlops-base:${GITHUB_SHA::8}"
+# on:
+#   push:
+#     branches:
+#       - master
+#     paths-ignore:
+#       - '**/*.ipynb'
+#       - 'data/**'
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#     steps:
 
-    - name: Push changes
-      uses: ad-m/github-push-action@master
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+#     - name: Install jq and sponge
+#       run: |
+#         sudo apt-get install -y jq moreutils
 
-    - name: Run pipeline
-      uses: chanwit/action-eksctl-kale@v2
-      with:
-        region: ap-southeast-1
-        cluster: eks-kubeflow
-        awsAccessKeyId: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        awsSecretAccessKey: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        notebook: titanic_ml_comparison.ipynb
+#     - name: Check out
+#       uses: actions/checkout@v1
 
-    - name: Download the new model from S3
-      uses: chanwit/action-s3-downloader@master
-      with:
-        awsAccessKeyId: ${{ secrets.MINIO_ACCESS_KEY_ID }}
-        awsSecretAccessKey: ${{ secrets.MINIO_SECRET_ACCESS_KEY }}
-        s3Endpoint: ${{ secrets.MINIO_URL }}
-        s3BucketAndFile: /mlops-profile-titanic/model.joblib
+#     # - name: Login into a registry
+#     #   uses: azure/docker-login@v1
+#     #   with:
+#     #     username: ${{ secrets.REGISTRY_USERNAME }}
+#     #     password: ${{ secrets.REGISTRY_PASSWORD }}
+#     - name: Get OCIR Repository Test
+#       env:
+#         OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+#         OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+#         OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+#         OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
+#         OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
 
-    - name: Build and push model container
-      run: |
-        #
-        # setup variables
-        #
-        export MODEL_IMAGE_NAME="chanwit/titanic-model"
-        export MODEL_IMAGE_TAG=v$(date "+%Y%m%d%H%M%S")
-        # version from file
-        export MODEL_IMAGE_VERSION=$(cat MODEL_IMAGE_VERSION)
-        #
-        # actions
-        #
-        docker build --build-arg model=model.joblib -f Dockerfile.model -t ${MODEL_IMAGE_NAME}:latest .
-        docker tag      ${MODEL_IMAGE_NAME}:latest ${MODEL_IMAGE_NAME}:${MODEL_IMAGE_TAG}
-        docker tag      ${MODEL_IMAGE_NAME}:latest ${MODEL_IMAGE_NAME}:${MODEL_IMAGE_VERSION}
-        docker push     ${MODEL_IMAGE_NAME}:${MODEL_IMAGE_TAG}
-        docker push     ${MODEL_IMAGE_NAME}:${MODEL_IMAGE_VERSION}
-        docker push     ${MODEL_IMAGE_NAME}:latest
+#     - name: Log into OCIR
+#       uses: oracle-actions/login-ocir@v1.0
+#         id: login-ocir
+#         with:
+#           auth_token: ${{ secrets.OCI_AUTH_TOKEN }}
+
+#       - name: Tag and push a container image
+#         id: tag-and-push-image
+#         run: |
+#           docker pull oraclelinux:8-slim
+#           docker tag "oraclelinux:8-slim" "${{ steps.get-ocir-repository.outputs.repo_path }}:8-slim"
+#           docker push "${{ steps.get-ocir-repository.outputs.repo_path }}:8-slim"
+
+#     # - name: Build, tag and push the base image
+#     #   run: |
+#     #     docker build -t chanwit/titanic-mlops-base:${GITHUB_SHA::8} -f Dockerfile.pipeline .
+#     #     docker push chanwit/titanic-mlops-base:${GITHUB_SHA::8}
+#     #     docker tag  chanwit/titanic-mlops-base:${GITHUB_SHA::8} chanwit/titanic-mlops-base:latest
+#     #     docker push chanwit/titanic-mlops-base:latest
+
+#     - name: Create changes back to Jupyter Notebook
+#       run: |
+#         jq --arg IMAGE_NAME "chanwit/titanic-mlops-base:${GITHUB_SHA::8}" \
+#           '.metadata.kubeflow_noteobok.docker_image=$IMAGE_NAME' < titanic_ml_comparison.ipynb \
+#           | sponge titanic_ml_comparison.ipynb
+
+#     - name: Commit files
+#       run: |
+#         git config --local user.email "action@github.com"
+#         git config --local user.name "GitHub Action"
+#         git commit -am "Update image to chanwit/titanic-mlops-base:${GITHUB_SHA::8}"
+
+#     - name: Push changes
+#       uses: ad-m/github-push-action@master
+#       with:
+#         github_token: ${{ secrets.GITHUB_TOKEN }}
+
+#     - name: Run pipeline
+#       uses: chanwit/action-eksctl-kale@v2
+#       with:
+#         region: ap-southeast-1
+#         cluster: eks-kubeflow
+#         awsAccessKeyId: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#         awsSecretAccessKey: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#         notebook: titanic_ml_comparison.ipynb
+
+#     - name: Download the new model from S3
+#       uses: chanwit/action-s3-downloader@master
+#       with:
+#         awsAccessKeyId: ${{ secrets.MINIO_ACCESS_KEY_ID }}
+#         awsSecretAccessKey: ${{ secrets.MINIO_SECRET_ACCESS_KEY }}
+#         s3Endpoint: ${{ secrets.MINIO_URL }}
+#         s3BucketAndFile: /mlops-profile-titanic/model.joblib
+
+#     - name: Build and push model container
+#       run: |
+#         #
+#         # setup variables
+#         #
+#         export MODEL_IMAGE_NAME="chanwit/titanic-model"
+#         export MODEL_IMAGE_TAG=v$(date "+%Y%m%d%H%M%S")
+#         # version from file
+#         export MODEL_IMAGE_VERSION=$(cat MODEL_IMAGE_VERSION)
+#         #
+#         # actions
+#         #
+#         docker build --build-arg model=model.joblib -f Dockerfile.model -t ${MODEL_IMAGE_NAME}:latest .
+#         docker tag      ${MODEL_IMAGE_NAME}:latest ${MODEL_IMAGE_NAME}:${MODEL_IMAGE_TAG}
+#         docker tag      ${MODEL_IMAGE_NAME}:latest ${MODEL_IMAGE_NAME}:${MODEL_IMAGE_VERSION}
+#         docker push     ${MODEL_IMAGE_NAME}:${MODEL_IMAGE_TAG}
+#         docker push     ${MODEL_IMAGE_NAME}:${MODEL_IMAGE_VERSION}
+#         docker push     ${MODEL_IMAGE_NAME}:latest
