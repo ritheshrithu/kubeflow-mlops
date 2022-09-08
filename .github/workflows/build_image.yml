@@ -39,6 +39,9 @@ jobs:
       #     docker tag "oraclelinux:8-slim" "${{ steps.get-ocir-repository.outputs.repo_path }}:8-slim"
       #     docker push "${{ steps.get-ocir-repository.outputs.repo_path }}:8-slim"
 
+      - name: Check out
+        uses: actions/checkout@v1
+
       - name: Build, tag and push the base image
         run: |
           docker build -t ritheshrithu/kubeflow-mlops-base:${GITHUB_SHA::8} -f ./Dockerfile.pipeline .
