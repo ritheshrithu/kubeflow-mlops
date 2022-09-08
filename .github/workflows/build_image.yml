@@ -35,11 +35,11 @@ jobs:
           context: .
           file: ./Dockerfile.pipeline
           push: true
-          tags: ritheshrithu/kubeflow-mlops-base:${GITHUB_SHA::8}
+          tags: ritheshrithu/kubeflow-mlops-base:v1
 
       - name: Create changes back to Jupyter Notebook
         run: |
-          jq --arg IMAGE_NAME "ritheshrithu/kubeflow-mlops-base:${GITHUB_SHA::8}" \
+          jq --arg IMAGE_NAME "ritheshrithu/kubeflow-mlops-base:v1" \
             '.metadata.kubeflow_noteobok.docker_image=$IMAGE_NAME' < titanic_ml_comparison.ipynb \
             | sponge titanic_ml_comparison.ipynb
 
@@ -47,7 +47,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git commit -am "Update image to ritheshrithu/kubeflow-mlops-base:${GITHUB_SHA::8}"
+          git commit -am "Update image to ritheshrithu/kubeflow-mlops-base:v1"
 
       - name: Push changes
         uses: ad-m/github-push-action@master
