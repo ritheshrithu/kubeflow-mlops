@@ -41,7 +41,7 @@ jobs:
 
       - name: Build, tag and push the base image
         run: |
-          docker build -t ritheshrithu/kubeflow-mlops-base:${GITHUB_SHA::8} -f Dockerfile.pipeline .
+          docker build -t ritheshrithu/kubeflow-mlops-base:${GITHUB_SHA::8} -f ./Dockerfile.pipeline .
           docker push ritheshrithu/kubeflow-mlops-base:${GITHUB_SHA::8}
           docker tag  ritheshrithu/kubeflow-mlops-base:${GITHUB_SHA::8} ritheshrithu/kubeflow-mlops-base:latest
           docker push ritheshrithu/kubeflow-mlops-base:latest
